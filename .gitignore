@@ -1,4 +1,6 @@
-demo/node_modules/
-demo/bower_components/
-gulp-css-gsub/node_modules/
+gulp-css-gsub/node_modules
+coverage
 npm-debug.log
+debug.log
+/.idea/
+/.vscode/
