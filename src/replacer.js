@@ -267,6 +267,7 @@ export default class Replacer {
                     if (mediaRule.type != "rule") continue;
 
                     var newSelectors = [];
+                    var self = this;
 
                     for (var j=0, selector; selector=mediaRule.selectors[j]; j++) {
                         selector = selector.replace(regexp, function(a) {
@@ -298,6 +299,7 @@ export default class Replacer {
                 if (rule.type != "rule") continue;
 
                 var newSelectors = [];
+                var self = this;
 
                 for (var j=0, selector; selector=rule.selectors[j]; j++) {
                     selector = selector.replace(regexp, function(a) {
