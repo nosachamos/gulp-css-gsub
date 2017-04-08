@@ -13,7 +13,7 @@ export default (config) => {
             cssCode,
             jsCode;
 
-        replacer = new Replacer(config);
+        replacer = new Replacer.default(config);
         replacer.run();
 
         cssCode = replacer.generateCss(),
