@@ -60,7 +60,7 @@ export default class Replacer {
         let className = 'no-match';
         while (true) {
             className = this.counter.toString(34);
-            if (this.cssText.match(new RegExp('\\b\\.' + className + '\\b', 'gi'))) {
+            if (this.cssText.search(new RegExp('\\b\\.' + className + '\\b', 'gi')) > -1) {
                 this.counter++;
             } else break;
         }
