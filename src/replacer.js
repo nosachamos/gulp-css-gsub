@@ -57,11 +57,12 @@ export default class Replacer {
      * @return {String}
      */
     succ() {
+        let className = 'no-match';
         while (true) {
-            let className = this.counter.toString(34);
+            className = this.counter.toString(34);
             if (this.cssText.match(new RegExp('\\b\\.' + className + '\\b', 'gi'))) {
                 this.counter++;
-            }
+            } else break;
         }
 
         return className;
