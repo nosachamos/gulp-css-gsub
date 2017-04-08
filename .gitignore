@@ -1,4 +1,6 @@
-gulp-css-gsub/node_modules
+# Node
+node_modules
+dist
 coverage
 npm-debug.log
 debug.log

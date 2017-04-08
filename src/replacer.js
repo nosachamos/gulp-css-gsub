@@ -5,7 +5,7 @@ var esprima = require("esprima"),
     fs = require("fs");
 
 export default class Replacer {
-    
+
     /**
      * @param {Object} config
      * @param {String} config.prefix Used when CSS classes look like "{prefix}profile" "d-profile"
