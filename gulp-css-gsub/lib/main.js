@@ -1,15 +1,10 @@
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
 var through = require("through2"),
     Replacer = require("./replacer.js"),
     File = require("vinyl"),
     fs = require("fs");
 
-exports["default"] = function (config) {
-    return through.obj(function (file, encoding, callback) {
+export default (config => {
+    return through.obj((file, encoding, callback) => {
         config = Object.assign({
             cssIn: file.path
         }, config);
@@ -32,6 +27,4 @@ exports["default"] = function (config) {
 
         callback(null, file);
     });
-};
-
-module.exports = exports["default"];
+});

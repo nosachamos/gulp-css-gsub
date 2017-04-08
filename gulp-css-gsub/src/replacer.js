@@ -5,7 +5,7 @@ var esprima = require("esprima"),
     fs = require("fs");
 
 export default class Replacer {
-
+    
     /**
      * @param {Object} config
      * @param {String} config.prefix Used when CSS classes look like "{prefix}profile" "d-profile"
@@ -32,6 +32,7 @@ export default class Replacer {
      *                             found in js-file (probably unused).
      */
     constructor(config) {
+        this.counter = 0;
         this.config = Object.assign({
             regexp: null,
             prefix: null,
@@ -44,13 +45,6 @@ export default class Replacer {
             count: 0,
             items: {}
         };
-
-        this.DANGER_MIN_NAMES = [
-            "s0|s1|s2|s3|s4|s5|s6|s7|s8|s9|s10|s11|s12|",
-            "m0|m1|m2|m3|m4|m5|m6|m7|m8|m9|m10|m11|m12|",
-            "l0|l1|l3|l3|l4|l5|l6|l7|l8|l9|l10|l11|l12|",
-            "fa"
-        ].join("").split("|")
     }
     
     /**
@@ -62,63 +56,15 @@ export default class Replacer {
      * @param {String}
      * @return {String}
      */
-    succ(input) {
-        var alphabet = 'abcdefghijklmnopqrstuvwxyz',
-            length = alphabet.length,
-            result = input,
-            i = input.length,
-            index;
-            
-        while(i >= 0) {
-            var last = input.charAt(--i),
-                next = '',
-                carry = false;
-            
-            if (isNaN(last)) {
-                index = alphabet.indexOf(last.toLowerCase());
-                
-                if (index === -1) {
-                    next = last;
-                    carry = true;
-                }
-                else {
-                    var isUpperCase = last === last.toUpperCase();
-                    next = alphabet.charAt((index + 1) % length);
-                    if (isUpperCase) {
-                        next = next.toUpperCase();
-                    }
-                    
-                    carry = index + 1 >= length;
-                    if (carry && i === 0) {
-                        var added = isUpperCase ? 'A' : 'a';
-                        result = added + next + result.slice(1);
-                        break;
-                    }
-                }
-            }
-            else {
-                next = +last + 1;
-                if(next > 9) {
-                    next = 0;
-                    carry = true
-                }
-                
-                if (carry && i === 0) {
-                    result = '1' + next + result.slice(1);
-                    break;
-                }
-            }
-            
-            result = result.slice(0, i) + next + result.slice(i + 1);
-            if (!carry) {
-                break;
+    succ() {
+        while (true) {
+            let className = this.counter.toString(34);
+            if (this.cssText.match(new RegExp('\\b\\.' + className + '\\b', 'gi'))) {
+                this.counter++;
             }
         }
 
-        if(this.DANGER_MIN_NAMES.indexOf(result) > -1)
-            return this.succ(result);
-
-        return result;
+        return className;
     }
     
     /**
@@ -275,7 +221,7 @@ export default class Replacer {
         this.classes.forEach((cls) => {
             if(! replacements.items[cls]) {
                 replacements.items[cls] = key;
-                key = this.succ(key);
+                key = this.succ();
                 replacements.count ++;
             }
         });

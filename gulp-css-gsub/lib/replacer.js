@@ -1,20 +1,10 @@
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-
-var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
 var esprima = require("esprima"),
     css = require("css"),
     estraverse = require("estraverse"),
     escodegen = require("escodegen"),
     fs = require("fs");
 
-var Replacer = (function () {
+export default class Replacer {
 
     /**
      * @param {Object} config
@@ -41,10 +31,8 @@ var Replacer = (function () {
      * @param {Boolean} replaceAll Should be true to rename all CSS classes including those classes that couldn't be 
      *                             found in js-file (probably unused).
      */
-
-    function Replacer(config) {
-        _classCallCheck(this, Replacer);
-
+    constructor(config) {
+        this.counter = 0;
         this.config = Object.assign({
             regexp: null,
             prefix: null,
@@ -57,304 +45,218 @@ var Replacer = (function () {
             count: 0,
             items: {}
         };
-
-        this.DANGER_MIN_NAMES = ["s0|s1|s2|s3|s4|s5|s6|s7|s8|s9|s10|s11|s12|", "m0|m1|m2|m3|m4|m5|m6|m7|m8|m9|m10|m11|m12|", "l0|l1|l3|l3|l4|l5|l6|l7|l8|l9|l10|l11|l12|", "fa"].join("").split("|");
     }
 
     /**
      * a reusable empty function
      */
+    emptyFn() {}
 
-    _createClass(Replacer, [{
-        key: "emptyFn",
-        value: function emptyFn() {}
-
-        /**
-         * @param {String}
-         * @return {String}
-         */
-    }, {
-        key: "succ",
-        value: function succ(input) {
-            var alphabet = 'abcdefghijklmnopqrstuvwxyz',
-                length = alphabet.length,
-                result = input,
-                i = input.length,
-                index;
-
-            while (i >= 0) {
-                var last = input.charAt(--i),
-                    next = '',
-                    carry = false;
-
-                if (isNaN(last)) {
-                    index = alphabet.indexOf(last.toLowerCase());
-
-                    if (index === -1) {
-                        next = last;
-                        carry = true;
-                    } else {
-                        var isUpperCase = last === last.toUpperCase();
-                        next = alphabet.charAt((index + 1) % length);
-                        if (isUpperCase) {
-                            next = next.toUpperCase();
-                        }
-
-                        carry = index + 1 >= length;
-                        if (carry && i === 0) {
-                            var added = isUpperCase ? 'A' : 'a';
-                            result = added + next + result.slice(1);
-                            break;
-                        }
-                    }
-                } else {
-                    next = +last + 1;
-                    if (next > 9) {
-                        next = 0;
-                        carry = true;
-                    }
-
-                    if (carry && i === 0) {
-                        result = '1' + next + result.slice(1);
-                        break;
-                    }
-                }
-
-                result = result.slice(0, i) + next + result.slice(i + 1);
-                if (!carry) {
-                    break;
-                }
+    /**
+     * @param {String}
+     * @return {String}
+     */
+    succ() {
+        while (true) {
+            let className = this.counter.toString(34);
+            if (this.cssText.match(new RegExp('\\b\\.' + className + '\\b', 'gi'))) {
+                this.counter++;
             }
-
-            if (this.DANGER_MIN_NAMES.indexOf(result) > -1) return this.succ(result);
-
-            return result;
         }
 
-        /**
-         * an entry point.
-         */
-    }, {
-        key: "run",
-        value: function run() {
-            this.openFiles();
-            this.initFilesAst();
-            this.parseCssRules();
-            this.replace();
+        return className;
+    }
+
+    /**
+     * an entry point.
+     */
+    run() {
+        this.openFiles();
+        this.initFilesAst();
+        this.parseCssRules();
+        this.replace();
+    }
+
+    /**
+     * simply reads the content of CSS and js file.
+     */
+    openFiles() {
+        this.cssText = fs.readFileSync(this.config.cssIn, "utf8");
+        this.jsText = fs.readFileSync(this.config.jsIn, "utf8");
+    }
+
+    /**
+     * initializes AST for both CSS and JS.
+     */
+    initFilesAst() {
+        this.cssAst = css.parse(this.cssText);
+        this.jsAst = esprima.parse(this.jsText);
+    }
+
+    /**
+     * @return {RegExp} regexp to match CSS classes like: .d-user-profile
+     */
+    generateCssClsRegExp() {
+        var config = this.config;
+
+        if (config.prefix) return new RegExp("\\.(?:" + config.prefix + "){1}[0-9a-zA-Z\\-_]+", "g");
+
+        if (config.regexp) return new RegExp(config.regexp.toString().replace("\/", "\/."));
+
+        return new RegExp("\\.[0-9a-zA-Z\\-_]+", "g");
+    }
+
+    /**
+     * @return {RegExp} regexp to match CSS classes like: <div class="d-user-profile"></div>
+     */
+    generateJsClsRegExp() {
+        var config = this.config;
+
+        if (config.prefix) return new RegExp("(\\b" + config.prefix + "[0-9a-zA-Z\-_]+)", "g");
+
+        if (config.regexp) return config.regexp;
+
+        return new RegExp(this.classes.join("|"), "g");
+    }
+
+    /**
+     * parses CSS file to extract all CSS class names in required order.
+     */
+    parseCssRules() {
+        var config = this.config,
+            regexp = this.generateCssClsRegExp(),
+            classes = [];
+
+        this.rules = this.cssAst.stylesheet.rules;
+
+        for (var i = 0, rule; rule = this.rules[i]; i++) {
+            if (rule.type != "rule") continue;
+
+            var selectors = rule.selectors.join(" ").match(regexp);
+
+            if (selectors) classes = classes.concat(selectors.join(" ").replace(/\./g, "").split(" "));
         }
 
-        /**
-         * simply reads the content of CSS and js file.
-         */
-    }, {
-        key: "openFiles",
-        value: function openFiles() {
-            this.cssText = fs.readFileSync(this.config.cssIn, "utf8");
-            this.jsText = fs.readFileSync(this.config.jsIn, "utf8");
-        }
+        this.classes = classes.sort(function (a, b) {
+            return b.length - a.length;
+        }).filter(function (cls, pos) {
+            return classes.indexOf(cls) == pos;
+        });
+    }
 
-        /**
-         * initializes AST for both CSS and JS.
-         */
-    }, {
-        key: "initFilesAst",
-        value: function initFilesAst() {
-            this.cssAst = css.parse(this.cssText);
-            this.jsAst = esprima.parse(this.jsText);
-        }
+    /**
+     * replaces CSS class names in JS AST
+     * @return {Replacer}
+     */
+    replace() {
+        var config = this.config,
+            replace = config.replace;
 
-        /**
-         * @return {RegExp} regexp to match CSS classes like: .d-user-profile
-         */
-    }, {
-        key: "generateCssClsRegExp",
-        value: function generateCssClsRegExp() {
-            var config = this.config;
+        estraverse.traverse(this.jsAst, {
+            enter: (node, parent) => {
+                if (replace.call(this, node, parent) === false) return;
 
-            if (config.prefix) return new RegExp("\\.(?:" + config.prefix + "){1}[0-9a-zA-Z\\-_]+", "g");
+                if (node.type != "Literal") return;
 
-            if (config.regexp) return new RegExp(config.regexp.toString().replace("\/", "\/."));
+                if (typeof node.value != "string") return;
 
-            return new RegExp("\\.[0-9a-zA-Z\\-_]+", "g");
-        }
-
-        /**
-         * @return {RegExp} regexp to match CSS classes like: <div class="d-user-profile"></div>
-         */
-    }, {
-        key: "generateJsClsRegExp",
-        value: function generateJsClsRegExp() {
-            var config = this.config;
-
-            if (config.prefix) return new RegExp("(\\b" + config.prefix + "[0-9a-zA-Z\-_]+)", "g");
-
-            if (config.regexp) return config.regexp;
-
-            return new RegExp(this.classes.join("|"), "g");
-        }
-
-        /**
-         * parses CSS file to extract all CSS class names in required order.
-         */
-    }, {
-        key: "parseCssRules",
-        value: function parseCssRules() {
-            var config = this.config,
-                regexp = this.generateCssClsRegExp(),
-                classes = [];
-
-            this.rules = this.cssAst.stylesheet.rules;
-
-            for (var i = 0, rule; rule = this.rules[i]; i++) {
-                if (rule.type != "rule") continue;
-
-                var selectors = rule.selectors.join(" ").match(regexp);
-
-                if (selectors) classes = classes.concat(selectors.join(" ").replace(/\./g, "").split(" "));
+                this.replaceItem(node);
             }
+        });
 
-            this.classes = classes.sort(function (a, b) {
-                return b.length - a.length;
-            }).filter(function (cls, pos) {
-                return classes.indexOf(cls) == pos;
-            });
-        }
+        if (config.replaceAll) this.replaceAll();
 
-        /**
-         * replaces CSS class names in JS AST
-         * @return {Replacer}
-         */
-    }, {
-        key: "replace",
-        value: function replace() {
-            var _this = this;
+        return this;
+    }
 
-            var config = this.config,
-                replace = config.replace;
+    /**
+     * Replaces a CSS class name in string literal node with it's minimized version.
+     * @param {Object} node String literal node.
+     * @return {undefined}
+     */
+    replaceItem(node) {
+        var value = node.value,
+            key = this.key,
+            replacements = this.replacements,
+            regexp = this.generateJsClsRegExp(),
+            matches = value.match(regexp);
 
-            estraverse.traverse(this.jsAst, {
-                enter: function enter(node, parent) {
-                    if (replace.call(_this, node, parent) === false) return;
+        if (!matches) return;
 
-                    if (node.type != "Literal") return;
-
-                    if (typeof node.value != "string") return;
-
-                    _this.replaceItem(node);
-                }
-            });
-
-            if (config.replaceAll) this.replaceAll();
-
-            return this;
-        }
-
-        /**
-         * Replaces a CSS class name in string literal node with it's minimized version.
-         * @param {Object} node String literal node.
-         * @return {undefined}
-         */
-    }, {
-        key: "replaceItem",
-        value: function replaceItem(node) {
-            var value = node.value,
-                key = this.key,
-                replacements = this.replacements,
-                regexp = this.generateJsClsRegExp(),
-                matches = value.match(regexp);
-
-            if (!matches) return;
-
-            for (var i = 0, match; match = matches[i]; i++) {
-                if (!replacements.items[match]) {
-                    replacements.items[match] = key;
-                    key = this.succ(key);
-                }
+        for (var i = 0, match; match = matches[i]; i++) {
+            if (!replacements.items[match]) {
+                replacements.items[match] = key;
+                key = this.succ(key);
             }
+        }
 
-            value = value.replace(regexp, function (a) {
+        value = value.replace(regexp, function (a) {
+            replacements.count++;
+            return replacements.items[a];
+        });
+
+        node.value = value;
+        this.key = key;
+    }
+
+    /**
+     * peforms replacements for all unmatched CSS class names.
+     * @return {undefined}
+     */
+    replaceAll() {
+        var replacements = this.replacements,
+            key = this.key;
+
+        this.classes.forEach(cls => {
+            if (!replacements.items[cls]) {
+                replacements.items[cls] = key;
+                key = this.succ();
                 replacements.count++;
-                return replacements.items[a];
-            });
+            }
+        });
+    }
 
-            node.value = value;
-            this.key = key;
-        }
+    /**
+     * @returns {String} Resulting CSS code with replacements based on CSS AST.
+     */
+    generateCss() {
+        var replacements = this.replacements,
+            regexp = this.generateCssClsRegExp();
 
-        /**
-         * peforms replacements for all unmatched CSS class names.
-         * @return {undefined}
-         */
-    }, {
-        key: "replaceAll",
-        value: function replaceAll() {
-            var _this2 = this;
+        for (var i = 0, rule; rule = this.rules[i]; i++) {
+            if (rule.type != "rule") continue;
 
-            var replacements = this.replacements,
-                key = this.key;
+            var newSelectors = [];
 
-            this.classes.forEach(function (cls) {
-                if (!replacements.items[cls]) {
-                    replacements.items[cls] = key;
-                    key = _this2.succ(key);
-                    replacements.count++;
-                }
-            });
-        }
+            for (var j = 0, selector; selector = rule.selectors[j]; j++) {
+                selector = selector.replace(regexp, function (a) {
+                    return "." + replacements.items[a.replace(".", "")];
+                });
 
-        /**
-         * @returns {String} Resulting CSS code with replacements based on CSS AST.
-         */
-    }, {
-        key: "generateCss",
-        value: function generateCss() {
-            var replacements = this.replacements,
-                regexp = this.generateCssClsRegExp();
-
-            for (var i = 0, rule; rule = this.rules[i]; i++) {
-                if (rule.type != "rule") continue;
-
-                var newSelectors = [];
-
-                for (var j = 0, selector; selector = rule.selectors[j]; j++) {
-                    selector = selector.replace(regexp, function (a) {
-                        return "." + replacements.items[a.replace(".", "")];
-                    });
-
-                    if (/undefined/.test(selector))
-                        // it can mean two things:
-                        // 1. there is a CSS rule which is not used in js file.
-                        // 2. it's a bug in gulp-css-gsub :)
-                        console.log("undefined in " + selector + " === " + rule.selectors.join(" "));else newSelectors.push(selector);
-                }
-
-                if (newSelectors.length == rule.selectors.length) rule.selectors = newSelectors;else rule.selectors = []; // remove rule, because of unused selector.
+                if (/undefined/.test(selector))
+                    // it can mean two things:
+                    // 1. there is a CSS rule which is not used in js file.
+                    // 2. it's a bug in gulp-css-gsub :)
+                    console.log("undefined in " + selector + " === " + rule.selectors.join(" "));else newSelectors.push(selector);
             }
 
-            return css.stringify(this.cssAst);
+            if (newSelectors.length == rule.selectors.length) rule.selectors = newSelectors;else rule.selectors = []; // remove rule, because of unused selector.
         }
 
-        /**
-         * @returns {String} a resulting JS code with replacements based on JS AST.
-         */
-    }, {
-        key: "generateJs",
-        value: function generateJs() {
-            return escodegen.generate(this.jsAst);
-        }
+        return css.stringify(this.cssAst);
+    }
 
-        /**
-         * @return {Number} number of replacments.
-         */
-    }, {
-        key: "getReplacementsCount",
-        value: function getReplacementsCount() {
-            return this.replacements.count;
-        }
-    }]);
+    /**
+     * @returns {String} a resulting JS code with replacements based on JS AST.
+     */
+    generateJs() {
+        return escodegen.generate(this.jsAst);
+    }
 
-    return Replacer;
-})();
-
-exports["default"] = Replacer;
-module.exports = exports["default"];
+    /**
+     * @return {Number} number of replacments.
+     */
+    getReplacementsCount() {
+        return this.replacements.count;
+    }
+}
