@@ -11,3 +11,11 @@ gulp.task('default', () => {
             .pipe(gulp.dest('lib'));
     });
 });
+
+gulp.task('build', () => {
+        return gulp.src('src/*')
+            .pipe(babel({
+                presets: ['es2015']
+            }))
+            .pipe(gulp.dest('lib'));
+});
