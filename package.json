@@ -5,7 +5,7 @@
   "main": "./lib/main.js",
   "scripts": {
     "test": "./node_modules/mocha/bin/mocha",
-    "compile": "babel -d lib/ src/",
+    "compile": "babel -d lib/ src/ --plugins=transform-es2015-modules-umd",
     "prepublish": "npm run compile"
   },
   "author": "Ruslan Prytula <ruslan.prytula@gmail.com> (http://60devs.com)",
