@@ -36,6 +36,7 @@ export default class Replacer {
         this.config = Object.assign({
             regexp: null,
             prefix: null,
+            replacementsOutput: null,
             replace: this.emptyFn,
             replaceAll: false
         }, config);
@@ -66,18 +67,12 @@ export default class Replacer {
               continue;
             }
 
-            console.log('COUNTER: '+ this.counter);
-            console.log('CLASS NAME: '+ className);
-
             let regex = '\\b\\.' + className + '\\b';
-            console.log('REGEX: '+ regex);
 
             if (this.cssText.search(new RegExp(regex, 'gi')) > -1) {
-                console.log('FOUND A CLASH');
                 this.counter++;
 
             } else {
-                console.log('NO CLASH');
                 break;
             }
         }
@@ -94,6 +89,10 @@ export default class Replacer {
         this.initFilesAst();
         this.parseCssRules();
         this.replace();
+
+        if (this.config.replacementsOutput) {
+          fs.writeFile(this.config.replacementsOutput, JSON.stringify(this.replacements, null, 2) , 'utf-8');
+        }
     }
 
     /**
@@ -282,7 +281,7 @@ export default class Replacer {
                             // it can mean two things:
                             // 1. there is a CSS rule which is not used in js file.
                             // 2. it's a bug in gulp-css-gsub :)
-                            console.log("undefined in " + selector + " === " + mediaRule.selectors.join(" "))
+                            // console.log("undefined in " + selector + " === " + mediaRule.selectors.join(" "))
                         } else {
                             newSelectors.push(selector);
                         }
@@ -314,7 +313,7 @@ export default class Replacer {
                         // it can mean two things:
                         // 1. there is a CSS rule which is not used in js file.
                         // 2. it's a bug in gulp-css-gsub :)
-                        console.log("undefined in " + selector + " === " + rule.selectors.join(" "))
+                        // console.log("undefined in " + selector + " === " + rule.selectors.join(" "))
                     } else {
                         newSelectors.push(selector);
                     }
